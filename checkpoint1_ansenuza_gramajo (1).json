@@ -1,0 +1,339 @@
+{
+  "name": "M1 · Asesor Financiero del Emprendedor",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "0c89af16-4367-4272-97e1-d28ad2f63dc5",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        192
+      ],
+      "webhookId": "424853cd-6d66-48dc-9c99-1043d219b4da"
+    },
+    {
+      "parameters": {
+        "agent": "toolsAgent",
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=## ROL\nSos el Asesor Financiero del Emprendedor, un asistente del estudio contable que ayuda a emprendedores y monotributistas a registrar sus movimientos de dinero y a separar las finanzas personales de las del negocio. Hablás en español rioplatense, claro y breve.\n\n## ÁMBITO\nSolo trabajás con movimientos de dinero del usuario: gastos, ingresos, ahorros y retiros del negocio. Fecha de hoy: {{ $now.format('yyyy-MM-dd') }}.\n\n## OBJETIVO\n1. Entender el mensaje del usuario y detectar si describe un movimiento de dinero.\n2. Clasificarlo: Tipo (Ingreso, Gasto, Ahorro o Retiro), Ámbito (Personal o Negocio), Categoría, monto y medio de pago.\n3. Registrarlo con la herramienta Registrar_Movimiento y confirmar en una línea lo que se guardó.\n\n## REGLAS\n- Usá Registrar_Movimiento solo cuando el mensaje describe un movimiento concreto con monto. Para saludos, preguntas generales o mensajes sin monto, NO la uses.\n- Si falta el monto, preguntalo antes de registrar. Nunca inventes montos, fechas ni categorías.\n- Si no queda claro si el gasto es personal o del negocio, preguntalo en una sola pregunta.\n- Registrá un movimiento por llamada. Si el usuario menciona varios, registralos uno por uno.\n- No das asesoramiento impositivo, legal ni de inversiones, no hacés transferencias ni pagos, y no borrás ni modificás registros anteriores.\n\n## ESCALAMIENTO\nSi el usuario pide algo fuera de tu ámbito (consultas impositivas, reclamos, borrar datos), respondé: \"Eso lo tiene que ver tu contador del estudio. Te dejo registrada la consulta.\" y no uses herramientas.",
+          "maxIterations": 7,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "86380d23-a3a9-4f84-8a04-4a3a30892577",
+      "name": "Asesor Financiero (AI Agent)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        304,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {
+          "maxTokens": 800,
+          "temperature": 0.2
+        }
+      },
+      "id": "4de2a3ea-70cc-4b02-96c8-1b6b81b50b67",
+      "name": "OpenAI Chat Model (GPT-4o)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        432
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Registra UN movimiento de dinero (una fila) en la planilla de movimientos del cliente. Usala cuando el usuario cuenta que gastó, pagó, cobró, vendió, ahorró o retiró plata del negocio y el mensaje incluye un monto concreto. Ejemplos: \"gasté 38 mil en el súper con débito\", \"cobré 120.000 de una venta por transferencia\", \"pagué la luz del local 45000\", \"aparté 50 mil para las vacaciones\", \"saqué 100 mil de la caja del negocio para mí\". NO la uses para saludos, preguntas sobre cuánto gastó, consultas impositivas ni mensajes sin monto: en esos casos respondé sin herramientas o pedí el dato que falta. Si el usuario menciona varios movimientos, llamala una vez por cada uno.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1CSSWZb7QHMPjL0EoyfLxA3SRvdiNvuWQapwZOivSVHw/edit?usp=drivesdk",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2138661904,
+          "mode": "list",
+          "cachedResultName": "Movimientos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CSSWZb7QHMPjL0EoyfLxA3SRvdiNvuWQapwZOivSVHw/edit#gid=2138661904"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Fecha": "={{ $fromAI('Fecha', 'Fecha del movimiento en formato AAAA-MM-DD. Si el usuario no la menciona, usar la fecha de hoy', 'string') }}",
+            "Tipo": "={{ $fromAI('Tipo', 'Uno de: Ingreso, Gasto, Ahorro, Retiro', 'string') }}",
+            "Categoria": "={{ $fromAI('Categoria', 'Categoría corta, por ejemplo Supermercado, Servicios, Ventas, Proveedores, Transporte, Salud, Ocio, Ahorro', 'string') }}",
+            "Descripcion": "={{ $fromAI('Descripcion', 'Descripción breve del movimiento con las palabras del usuario', 'string') }}",
+            "Monto": "={{ $fromAI('Monto', 'Importe en pesos como número positivo, sin signo $ ni puntos de miles. 38 mil = 38000', 'number') }}",
+            "Medio_pago": "={{ $fromAI('Medio_pago', 'Efectivo, Débito, Crédito, Transferencia o Billetera virtual. Si no se menciona, Sin dato', 'string') }}",
+            "Cargado_por": "Chat",
+            "Registrado_el": "={{ $now.toISO() }}",
+            "Ambito": "={{ $fromAI('Ambito', 'Personal o Negocio', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo",
+              "displayName": "Tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ambito",
+              "displayName": "Ambito",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Categoria",
+              "displayName": "Categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Descripcion",
+              "displayName": "Descripcion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Monto",
+              "displayName": "Monto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Medio_pago",
+              "displayName": "Medio_pago",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cargado_por",
+              "displayName": "Cargado_por",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Registrado_el",
+              "displayName": "Registrado_el",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5b303656-b8ff-49a7-af40-818fb28ce0e6",
+      "name": "Registrar_Movimiento",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wKdbyqwhyZZWNVID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "ansegramajo@gmail.com",
+        "subject": "=[Log Asesor Financiero] {{ $now.format('yyyy-MM-dd HH:mm') }}",
+        "emailType": "text",
+        "message": "=Mensaje del usuario:\n{{ $('Chat Trigger').item.json.chatInput }}\n\nRespuesta del agente:\n{{ $json.output }}\n\nHerramientas usadas (Execution Log):\n{{ ($json.intermediateSteps || []).length ? JSON.stringify($json.intermediateSteps.map(s => ({ herramienta: s.action.tool, entrada: s.action.toolInput, resultado: s.observation })), null, 2) : 'El agente respondió sin usar herramientas.' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "6ec01d1d-4031-45ac-82bf-7dc3cdd1cfa8",
+      "name": "Log de observabilidad (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        672,
+        192
+      ],
+      "webhookId": "3a072813-82a8-4a1c-9735-7feb5a8546d6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "tJYHKAnU5CSTQxZm",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f787ad7-3cc8-4539-9dd4-64fd8686f26c",
+              "name": "output",
+              "value": "={{ $('Asesor Financiero (AI Agent)').item.json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "990437b2-d282-4e4e-8f94-9f94c443eeb4",
+      "name": "Respuesta al usuario",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## M1 · Agente base\nChat Trigger → AI Agent (Tools Agent, GPT-4o, máx. 7 iteraciones) con la herramienta lateral **Registrar_Movimiento** (Google Sheets) → **Log de observabilidad** por Gmail con los pasos del agente → respuesta al chat.",
+        "height": 180,
+        "width": 700,
+        "color": 5
+      },
+      "id": "e029024e-56bc-4083-81ce-fb0856cf2bf5",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -48
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Asesor Financiero (AI Agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (GPT-4o)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Asesor Financiero (AI Agent)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar_Movimiento": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asesor Financiero (AI Agent)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asesor Financiero (AI Agent)": {
+      "main": [
+        [
+          {
+            "node": "Log de observabilidad (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log de observabilidad (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Respuesta al usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "12c75e8a-92a5-447c-b2a4-5ece64d272b3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ad30006a3cab77fed1df51f98f112ed4dd388814100db9ff59f5d039dcde5666"
+  },
+  "nodeGroups": [],
+  "id": "2Iyq6NbizUt1EOuo",
+  "tags": []
+}
